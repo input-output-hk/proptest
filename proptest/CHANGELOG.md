@@ -1,3 +1,9 @@
+## Unreleased
+
+### New Features
+
+- Use xoshiro256++ as the default RNG.
+
 ## 1.0.0
 
 ### Breaking Changes

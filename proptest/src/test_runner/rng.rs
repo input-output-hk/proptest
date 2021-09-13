@@ -15,6 +15,7 @@ use byteorder::{ByteOrder, LittleEndian};
 use rand::{self, Rng, RngCore, SeedableRng};
 use rand_chacha::ChaChaRng;
 use rand_xorshift::XorShiftRng;
+use rand_xoshiro::Xoshiro256PlusPlus;
 
 /// Identifies a particular RNG algorithm supported by proptest.
 ///
@@ -23,6 +24,16 @@ use rand_xorshift::XorShiftRng;
 /// configuration to be expressed in the `Config` struct.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum RngAlgorithm {
+    /// The [xoshiro256++](https://docs.rs/rand_xoshiro/0.6.0/rand_xoshiro/struct.Xoshiro256PlusPlus.html)
+    /// algorithm.
+    ///
+    /// It is a fast algorithm with a small state that provides randomness,
+    /// that is usually good enough for the purpose of property testing.
+    ///
+    /// This is the default algorithm.
+    ///
+    /// The seed must be exactly 32 bytes.
+    Xoshiro,
     /// The [XorShift](https://rust-random.github.io/rand/rand_xorshift/struct.XorShiftRng.html)
     /// algorithm. This was the default up through and including Proptest 0.9.0.
     ///
@@ -33,7 +44,7 @@ pub enum RngAlgorithm {
     /// The seed must be exactly 16 bytes.
     XorShift,
     /// The [ChaCha](https://rust-random.github.io/rand/rand_chacha/struct.ChaChaRng.html)
-    /// algorithm. This became the default with Proptest 0.9.1.
+    /// algorithm.
     ///
     /// The seed must be exactly 32 bytes.
     ChaCha,
@@ -66,13 +77,14 @@ pub enum RngAlgorithm {
 
 impl Default for RngAlgorithm {
     fn default() -> Self {
-        RngAlgorithm::ChaCha
+        RngAlgorithm::Xoshiro
     }
 }
 
 impl RngAlgorithm {
     pub(crate) fn persistence_key(self) -> &'static str {
         match self {
+            RngAlgorithm::Xoshiro => "xx",
             RngAlgorithm::XorShift => "xs",
             RngAlgorithm::ChaCha => "cc",
             RngAlgorithm::PassThrough => "pt",
@@ -83,6 +95,7 @@ impl RngAlgorithm {
 
     pub(crate) fn from_persistence_key(k: &str) -> Option<Self> {
         match k {
+            "xx" => Some(RngAlgorithm::Xoshiro),
             "xs" => Some(RngAlgorithm::XorShift),
             "cc" => Some(RngAlgorithm::ChaCha),
             "pt" => Some(RngAlgorithm::PassThrough),
@@ -114,6 +127,7 @@ pub struct TestRng {
 
 #[derive(Clone, Debug)]
 enum TestRngImpl {
+    Xoshiro(Xoshiro256PlusPlus),
     XorShift(XorShiftRng),
     ChaCha(ChaChaRng),
     PassThrough {
@@ -130,6 +144,8 @@ enum TestRngImpl {
 impl RngCore for TestRng {
     fn next_u32(&mut self) -> u32 {
         match &mut self.rng {
+            &mut TestRngImpl::Xoshiro(ref mut rng) => rng.next_u32(),
+
             &mut TestRngImpl::XorShift(ref mut rng) => rng.next_u32(),
 
             &mut TestRngImpl::ChaCha(ref mut rng) => rng.next_u32(),
@@ -153,6 +169,8 @@ impl RngCore for TestRng {
 
     fn next_u64(&mut self) -> u64 {
         match &mut self.rng {
+            &mut TestRngImpl::Xoshiro(ref mut rng) => rng.next_u64(),
+
             &mut TestRngImpl::XorShift(ref mut rng) => rng.next_u64(),
 
             &mut TestRngImpl::ChaCha(ref mut rng) => rng.next_u64(),
@@ -176,6 +194,8 @@ impl RngCore for TestRng {
 
     fn fill_bytes(&mut self, dest: &mut [u8]) {
         match &mut self.rng {
+            &mut TestRngImpl::Xoshiro(ref mut rng) => rng.fill_bytes(dest),
+
             &mut TestRngImpl::XorShift(ref mut rng) => rng.fill_bytes(dest),
 
             &mut TestRngImpl::ChaCha(ref mut rng) => rng.fill_bytes(dest),
@@ -207,6 +227,8 @@ impl RngCore for TestRng {
 
     fn try_fill_bytes(&mut self, dest: &mut [u8]) -> Result<(), rand::Error> {
         match self.rng {
+            TestRngImpl::Xoshiro(ref mut rng) => rng.try_fill_bytes(dest),
+
             TestRngImpl::XorShift(ref mut rng) => rng.try_fill_bytes(dest),
 
             TestRngImpl::ChaCha(ref mut rng) => rng.try_fill_bytes(dest),
@@ -232,6 +254,7 @@ impl RngCore for TestRng {
 
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) enum Seed {
+    Xoshiro([u8; 32]),
     XorShift([u8; 16]),
     ChaCha([u8; 32]),
     PassThrough(Option<(usize, usize)>, Arc<[u8]>),
@@ -241,6 +264,17 @@ pub(crate) enum Seed {
 impl Seed {
     pub(crate) fn from_bytes(algorithm: RngAlgorithm, seed: &[u8]) -> Self {
         match algorithm {
+            RngAlgorithm::Xoshiro => {
+                assert_eq!(
+                    32,
+                    seed.len(),
+                    "xoshiro256++ requires a 32-byte seed"
+                );
+                let mut buf = [0; 32];
+                buf.copy_from_slice(seed);
+                Seed::Xoshiro(buf)
+            }
+
             RngAlgorithm::XorShift => {
                 assert_eq!(16, seed.len(), "XorShift requires a 16-byte seed");
                 let mut buf = [0; 16];
@@ -289,6 +323,16 @@ impl Seed {
             string.trim().split(char::is_whitespace).collect::<Vec<_>>();
         RngAlgorithm::from_persistence_key(&parts[0]).and_then(
             |alg| match alg {
+                RngAlgorithm::Xoshiro => {
+                    if 2 != parts.len() {
+                        return None;
+                    }
+
+                    let mut seed = [0u8; 32];
+                    from_base16(&mut seed, &parts[1])?;
+                    Some(Seed::Xoshiro(seed))
+                }
+
                 RngAlgorithm::XorShift => {
                     if 5 != parts.len() {
                         return None;
@@ -353,6 +397,14 @@ impl Seed {
         }
 
         match *self {
+            Seed::Xoshiro(ref seed) => {
+                let mut string =
+                    RngAlgorithm::Xoshiro.persistence_key().to_owned();
+                string.push(' ');
+                to_base16(&mut string, seed);
+                string
+            }
+
             Seed::XorShift(ref seed) => {
                 let mut dwords = [0u32; 4];
                 LittleEndian::read_u32_into(seed, &mut dwords[..]);
@@ -428,6 +480,9 @@ impl TestRng {
         {
             Self {
                 rng: match algorithm {
+                    RngAlgorithm::Xoshiro => {
+                        TestRngImpl::Xoshiro(Xoshiro256PlusPlus::from_entropy())
+                    }
                     RngAlgorithm::XorShift => {
                         TestRngImpl::XorShift(XorShiftRng::from_entropy())
                     }
@@ -468,6 +523,12 @@ impl TestRng {
         0xf4, 0x16, 0x16, 0x48, 0xc3, 0xac, 0x77, 0xac, 0x72, 0x20, 0x0b, 0xea,
         0x99, 0x67, 0x2d, 0x6d, 0xca, 0x9f, 0x76, 0xaf, 0x1b, 0x09, 0x73, 0xa0,
         0x59, 0x22, 0x6d, 0xc5, 0x46, 0x39, 0x1c, 0x4a,
+    ];
+
+    const SEED_FOR_XOSHIRO: [u8; 32] = [
+        0xd5, 0xcf, 0xc6, 0x21, 0xeb, 0xb0, 0xfe, 0x55, 0xaf, 0xb1, 0x2c, 0x2b,
+        0xc8, 0x28, 0xf0, 0x42, 0x15, 0x22, 0xba, 0xea, 0x4a, 0x5d, 0x73, 0x78,
+        0x26, 0x34, 0x29, 0x1c, 0x4a, 0x51, 0x69, 0x23,
     ];
 
     /// Returns a `TestRng` with a seed generated with the
@@ -535,6 +596,7 @@ impl TestRng {
     /// issues.
     pub fn deterministic_rng(algorithm: RngAlgorithm) -> Self {
         Self::from_seed_internal(match algorithm {
+            RngAlgorithm::Xoshiro => Seed::Xoshiro(TestRng::SEED_FOR_XOSHIRO),
             RngAlgorithm::XorShift => {
                 Seed::XorShift(TestRng::SEED_FOR_XOR_SHIFT)
             }
@@ -569,6 +631,8 @@ impl TestRng {
     /// Randomize a perturbed randomized seed from the given TestRng.
     pub(crate) fn new_rng_seed(&mut self) -> Seed {
         match self.rng {
+            TestRngImpl::Xoshiro(ref mut rng) => Seed::Xoshiro(rng.gen()),
+
             TestRngImpl::XorShift(ref mut rng) => {
                 let mut seed = rng.gen::<[u8; 16]>();
 
@@ -612,6 +676,10 @@ impl TestRng {
     fn from_seed_internal(seed: Seed) -> Self {
         Self {
             rng: match seed {
+                Seed::Xoshiro(seed) => {
+                    TestRngImpl::Xoshiro(Xoshiro256PlusPlus::from_seed(seed))
+                }
+
                 Seed::XorShift(seed) => {
                     TestRngImpl::XorShift(XorShiftRng::from_seed(seed))
                 }
