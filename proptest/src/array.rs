@@ -188,57 +188,6 @@ impl<T: ValueTree, const N: usize> ValueTree for ArrayValueTree<[T; N]> {
     }
 }
 
-macro_rules! small_array {
-    ($n:tt $uni:ident) => {
-        /// Create a strategy to generate fixed-length arrays.
-        ///
-        /// All values within the new strategy are generated using the given
-        /// strategy. The length of the array corresponds to the suffix of the
-        /// name of this function.
-        ///
-        /// See [`UniformArrayStrategy`](struct.UniformArrayStrategy.html) for
-        /// example usage.
-        pub fn $uni<S: Strategy>(
-            strategy: S,
-        ) -> UniformArrayStrategy<S, [S::Value; $n]> {
-            uniform(strategy)
-        }
-    };
-}
-
-small_array!(1 uniform1);
-small_array!(2 uniform2);
-small_array!(3 uniform3);
-small_array!(4 uniform4);
-small_array!(5 uniform5);
-small_array!(6 uniform6);
-small_array!(7 uniform7);
-small_array!(8 uniform8);
-small_array!(9 uniform9);
-small_array!(10 uniform10);
-small_array!(11 uniform11);
-small_array!(12 uniform12);
-small_array!(13 uniform13);
-small_array!(14 uniform14);
-small_array!(15 uniform15);
-small_array!(16 uniform16);
-small_array!(17 uniform17);
-small_array!(18 uniform18);
-small_array!(19 uniform19);
-small_array!(20 uniform20);
-small_array!(21 uniform21);
-small_array!(22 uniform22);
-small_array!(23 uniform23);
-small_array!(24 uniform24);
-small_array!(25 uniform25);
-small_array!(26 uniform26);
-small_array!(27 uniform27);
-small_array!(28 uniform28);
-small_array!(29 uniform29);
-small_array!(30 uniform30);
-small_array!(31 uniform31);
-small_array!(32 uniform32);
-
 #[cfg(test)]
 mod test {
     use super::*;

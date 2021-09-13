@@ -1,5 +1,11 @@
 ## Unreleased
 
+### Breaking Changes
+
+- The minimum supported Rust version has been increased to 1.51.0.
+- `uniform{1..32}` functions for small arrays are now removed as we can use
+  const generics.
+
 ### New Features
 
 - Use xoshiro256++ as the default RNG.
