@@ -91,6 +91,9 @@ version = "0.8"
 default-features = false
 features = ["alloc"]
 
+[dependencies.rand_xoshiro]
+version = "0.6"
+
 [dependencies.rand_xorshift]
 version = "0.3"
 
