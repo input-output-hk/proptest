@@ -12,28 +12,29 @@ use core::num::{
     NonZeroU128, NonZeroU16, NonZeroU32, NonZeroU64, NonZeroU8, NonZeroUsize,
 };
 
-use crate::{
-    arbitrary::{any, Arbitrary},
-    strategy::{BoxedStrategy, Filter},
-};
+use core::convert::TryInto;
+use core::ops::Range;
 
-use super::StrategyFor;
+use crate::{
+    arbitrary::Arbitrary,
+    strategy::{Map, Strategy},
+};
 
 macro_rules! non_zero_impl {
     ($base:ty, $non_zero:ty) => {
         impl Arbitrary for $non_zero {
             type Parameters = ();
-            type Strategy = BoxedStrategy<Self>;
+            type Strategy = Map<Range<$base>, fn($base) -> Self>;
 
             fn arbitrary_with((): Self::Parameters) -> Self::Strategy {
-                any::<$base>()
-                    .prop_filter("must be non-zero", |i| i != 0)
-                    .prop_map(|i| i.try_into().unwrap())
-                    .boxed()
+                (1..(<$base>::MAX)).prop_map(|i| i.try_into().unwrap())
             }
         }
     };
 }
+
+
+
 
 non_zero_impl!(u8, NonZeroU8);
 non_zero_impl!(u16, NonZeroU16);
@@ -47,3 +48,4 @@ non_zero_impl!(i32, NonZeroI32);
 non_zero_impl!(i64, NonZeroI64);
 non_zero_impl!(i128, NonZeroI128);
 non_zero_impl!(isize, NonZeroIsize);
+
