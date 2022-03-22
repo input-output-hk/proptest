@@ -14,26 +14,42 @@ use crate::strategy::Map;
 use super::Strategy;
 use super::{any, Arbitrary, StrategyFor};
 
-macro_rules! evm_impl {
+macro_rules! hash_impl {
     ($t:ty, $bytes:literal) => {
-        impl Arbitrary for &t {
+        impl Arbitrary for $t {
             type Parameters = ();
             type Strategy =
                 Map<StrategyFor<[u8; $bytes]>, fn([u8; $bytes]) -> Self>;
 
             fn arbitrary_with((): Self::Parameters) -> Self::Strategy {
-                any::<[u8; $bytes]>().prop_map(|bytes| $t::from_slice(&bytes))
+                any::<[u8; $bytes]>().prop_map(|bytes| <$t>::from_slice(&bytes))
             }
         }
     };
 }
 
-evm_impl!(H128, 16);
-evm_impl!(H160, 20);
-evm_impl!(H256, 32);
-evm_impl!(H512, 64);
+macro_rules! prim_impl {
+    ($t:ty, $u64s:literal) => {
+        impl Arbitrary for $t {
+            type Parameters = ();
+            type Strategy =
+                Map<StrategyFor<[u64; $u64s]>, fn([u64; $u64s]) -> Self>;
 
-evm_impl!(U128, 16);
-evm_impl!(U256, 32);
-evm_impl!(U512, 64);
+            fn arbitrary_with((): Self::Parameters) -> Self::Strategy {
+                fn map(i: [u64; $u64s]) -> $t {
+                    <$t> (i)
+                }
+                any::<[u64; $u64s]>().prop_map(map)
+            }
+        }
+    };
+}
 
+hash_impl!(H128, 16);
+hash_impl!(H160, 20);
+hash_impl!(H256, 32);
+hash_impl!(H512, 64);
+
+prim_impl!(U128, 2);
+prim_impl!(U256, 4);
+prim_impl!(U512, 8);
