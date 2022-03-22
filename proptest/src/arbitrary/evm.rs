@@ -36,10 +36,7 @@ macro_rules! prim_impl {
                 Map<StrategyFor<[u64; $u64s]>, fn([u64; $u64s]) -> Self>;
 
             fn arbitrary_with((): Self::Parameters) -> Self::Strategy {
-                fn map(i: [u64; $u64s]) -> $t {
-                    <$t> (i)
-                }
-                any::<[u64; $u64s]>().prop_map(map)
+                any::<[u64; $u64s]>().prop_map(Self)
             }
         }
     };
@@ -53,3 +50,4 @@ hash_impl!(H512, 64);
 prim_impl!(U128, 2);
 prim_impl!(U256, 4);
 prim_impl!(U512, 8);
+
