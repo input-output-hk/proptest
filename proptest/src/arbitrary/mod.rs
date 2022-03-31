@@ -43,6 +43,9 @@ mod _alloc;
 #[cfg(feature = "std")]
 mod _std;
 
+#[cfg(feature = "evm")]
+mod evm;
+
 pub use self::traits::*;
 
 //==============================================================================

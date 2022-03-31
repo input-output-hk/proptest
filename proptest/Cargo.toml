@@ -55,12 +55,19 @@ atomic64bit = []
 # passed (see https://github.com/AltSysrq/proptest/issues/124).
 break-dead-code = []
 
+evm = ["primitive-types"]
+
 [dependencies]
 bitflags = "1.0.1"
 
 # [dependencies.hashmap_core]
 # version = "0.1.5"
 # optional = true
+
+[dependencies.primitive-types]
+version = "0.10.1"
+optional = true
+features = ["std"]
 
 [dependencies.lazy_static]
 version = "1.2"
