@@ -33,6 +33,7 @@ mod arrays;
 mod primitives;
 mod sample;
 mod tuples;
+mod non_zero;
 
 mod _core;
 
